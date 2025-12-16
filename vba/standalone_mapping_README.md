@@ -59,17 +59,17 @@ Example output:
 
 Section 1: Murtida iyo Maadda (Title)
 Section 2: Dedication (Heading 1)
-Section 2: Acknowledgments (Heading 2)
-Section 3: Table of Contents (Heading 1)
-Section 4: Preface (Heading 1)
-Section 5: Wisdom Tales (Heading 1)
-Section 6: Glossary (Heading 1)
-Section 7: About the Author (Heading 1)
-Section 8: Copyright Notice (Heading 1)
+Section 3: Acknowledgments (Heading 2)
+Section 4: Table of Contents (Heading 1)
+Section 5: Preface (Heading 1)
+Section 6: Wisdom Tales (Heading 1)
+Section 7: Glossary (Heading 1)
+Section 8: About the Author (Heading 1)
+Section 9: Copyright Notice (Heading 1)
 
 === SUMMARY ===
 Total headings found and normalized: 9
-Total sections: 8
+Total sections: 9
 ```
 
 ### 2. Message Box (Summary)

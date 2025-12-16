@@ -125,9 +125,11 @@ Private Function CleanParagraphText(ByVal value As String) As String
     ' Trim whitespace
     cleaned = Trim$(cleaned)
     
-    ' Remove trailing colon if present
-    If Len(cleaned) > 0 And Right$(cleaned, 1) = ":" Then
+    ' Remove trailing colon if present (and string has more than just the colon)
+    If Len(cleaned) > 1 And Right$(cleaned, 1) = ":" Then
         cleaned = Left$(cleaned, Len(cleaned) - 1)
+    ElseIf cleaned = ":" Then
+        cleaned = ""
     End If
     
     CleanParagraphText = cleaned
