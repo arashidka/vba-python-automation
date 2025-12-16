@@ -69,27 +69,29 @@ Private Sub AddCenteredPageNumbers(ByVal doc As Document)
     Dim footer As HeaderFooter
 
     For Each sec In doc.Sections
-        For Each footer In sec.Footers
-            RemoveExistingPageFields footer
-            footer.Range.Fields.Add Range:=footer.Range, Type:=wdFieldPage
-            footer.Range.ParagraphFormat.Alignment = wdAlignParagraphCenter
-        Next footer
+        Set footer = sec.Footers(wdHeaderFooterPrimary)
+
+        If Not footer Is Nothing Then
+            ClearPageNumbers footer
+            footer.PageNumbers.NumberStyle = wdPageNumberStyleArabic
+            footer.PageNumbers.RestartNumberingAtSection = False
+            footer.PageNumbers.Add PageNumberAlignment:=wdAlignPageNumberCenter, FirstPage:=True
+        End If
     Next sec
     Exit Sub
 PageErr:
     HandleError "AddCenteredPageNumbers", Err
 End Sub
 
-Private Sub RemoveExistingPageFields(ByVal footer As HeaderFooter)
-    On Error GoTo FieldErr
-    Dim fld As Field
+Private Sub ClearPageNumbers(ByVal footer As HeaderFooter)
+    On Error GoTo NumberErr
 
-    For Each fld In footer.Range.Fields
-        If fld.Type = wdFieldPage Then fld.Delete
-    Next fld
+    Do While footer.PageNumbers.Count > 0
+        footer.PageNumbers(1).Delete
+    Loop
     Exit Sub
-FieldErr:
-    HandleError "RemoveExistingPageFields", Err
+NumberErr:
+    HandleError "ClearPageNumbers", Err
 End Sub
 
 ' Builds the Title Page with title, author, contact, and date
