@@ -16,6 +16,7 @@ Sub ApplyFullManuscriptTemplate()
     ConfigureStyles doc
     BuildFrontMatter doc
     ApplyBodyTemplate doc
+    MapSectionsAndNormalizeHeadings doc
     InsertHeadersFooters doc
     FinalizeDocument doc
 
@@ -25,6 +26,32 @@ CleanExit:
 MasterErr:
     HandleError "ApplyFullManuscriptTemplate", Err
     Resume CleanExit
+End Sub
+
+'============== MODULE: MAP & NORMALIZE HEADINGS =============='
+' Maps sections/headings and enforces consistent heading styles
+Sub MapSectionsAndNormalizeHeadings(ByVal doc As Document)
+    On Error GoTo ErrorHandler
+
+    Dim para As Paragraph
+    Dim headingReport As String
+    Dim normalized As String
+    Dim sectionIndex As Long
+
+    headingReport = "Heading map:" & vbCrLf
+
+    For Each para In doc.Paragraphs
+        normalized = NormalizeHeadingParagraph(para)
+        If Len(normalized) > 0 Then
+            sectionIndex = para.Range.Sections(1).Index
+            headingReport = headingReport & "Section " & sectionIndex & ": " & normalized & " (" & para.Range.Style & ")" & vbCrLf
+        End If
+    Next para
+
+    Debug.Print headingReport
+    Exit Sub
+ErrorHandler:
+    HandleError "MapSectionsAndNormalizeHeadings", Err
 End Sub
 
 ' Legacy entry point preserved for compatibility
@@ -409,6 +436,67 @@ Private Sub ConfigureLessonStyle(ByVal lessonStyle As Style)
         .Alignment = wdAlignParagraphLeft
     End With
 End Sub
+
+Private Function NormalizeHeadingParagraph(ByVal para As Paragraph) As String
+    On Error GoTo ErrorHandler
+
+    Dim textValue As String
+    Dim cleaned As String
+
+    textValue = para.Range.Text
+    cleaned = CleanParagraphText(textValue)
+
+    Select Case UCase$(cleaned)
+        Case "MURTIDA IYO MAADDA"
+            para.Range.Style = wdStyleTitle
+            NormalizeHeadingParagraph = "Murtida iyo Maadda"
+        Case "DEDICATION"
+            para.Range.Style = wdStyleHeading1
+            NormalizeHeadingParagraph = "Dedication"
+        Case "ACKNOWLEDGMENTS", "ACKNOWLEDGMENTS:"
+            para.Range.Style = wdStyleHeading2
+            NormalizeHeadingParagraph = "Acknowledgments"
+        Case "TABLE OF CONTENTS"
+            para.Range.Style = wdStyleHeading1
+            NormalizeHeadingParagraph = "Table of Contents"
+        Case "PREFACE"
+            para.Range.Style = wdStyleHeading1
+            NormalizeHeadingParagraph = "Preface"
+        Case "WISDOM TALES"
+            para.Range.Style = wdStyleHeading1
+            NormalizeHeadingParagraph = "Wisdom Tales"
+        Case "GLOSSARY"
+            para.Range.Style = wdStyleHeading1
+            NormalizeHeadingParagraph = "Glossary"
+        Case "ABOUT THE AUTHOR"
+            para.Range.Style = wdStyleHeading1
+            NormalizeHeadingParagraph = "About the Author"
+        Case "COPYRIGHT NOTICE"
+            para.Range.Style = wdStyleHeading1
+            NormalizeHeadingParagraph = "Copyright Notice"
+        Case Else
+            NormalizeHeadingParagraph = vbNullString
+    End Select
+
+    Exit Function
+ErrorHandler:
+    HandleError "NormalizeHeadingParagraph", Err
+End Function
+
+Private Function CleanParagraphText(ByVal value As String) As String
+    Dim cleaned As String
+
+    cleaned = Replace(value, vbCr, "")
+    cleaned = Replace(cleaned, vbLf, "")
+    cleaned = Replace(cleaned, vbTab, " ")
+    cleaned = Trim$(cleaned)
+
+    If Right$(cleaned, 1) = ":" Then
+        cleaned = Left$(cleaned, Len(cleaned) - 1)
+    End If
+
+    CleanParagraphText = cleaned
+End Function
 
 ' Inserts Glossary section with placeholder terms
 Sub InsertGlossarySection(ByVal doc As Document)
