@@ -72,6 +72,90 @@ Private Sub HandleError(ByVal procedureName As String, ByVal errObj As ErrObject
     MsgBox msg, vbExclamation, "Murtida Template"
 End Sub
 
+'============== MODULE: CLEANUP ORPHANED NUMBERS =============='
+' Removes paragraphs that contain only orphaned numbers while preserving TOC and headers/footers
+Sub RemoveOrphanedNumbers()
+    On Error GoTo ErrorHandler
+
+    Dim doc As Document
+    Dim para As Paragraph
+    Dim trimmedText As String
+    Dim cleaned As String
+    Dim removedCount As Long
+    Dim undoRecord As UndoRecord
+
+    Set doc = ActiveDocument
+    Set undoRecord = Application.UndoRecord
+
+    undoRecord.StartCustomRecord "Remove Orphaned Numbers"
+
+    For Each para In doc.Paragraphs
+        If ShouldInspectParagraph(para) Then
+            trimmedText = Trim$(para.Range.Text)
+
+            If Len(trimmedText) > 0 And Len(trimmedText) <= 4 Then
+                cleaned = NormalizeNumericCandidate(trimmedText)
+
+                If IsNumeric(cleaned) Then
+                    para.Range.Delete
+                    removedCount = removedCount + 1
+                End If
+            End If
+        End If
+    Next para
+
+    MsgBox "Removed " & removedCount & " orphaned number lines", vbInformation, "Remove Orphaned Numbers"
+
+CleanExit:
+    undoRecord.EndCustomRecord
+    Exit Sub
+ErrorHandler:
+    HandleError "RemoveOrphanedNumbers", Err
+    GoTo CleanExit
+End Sub
+
+Private Function ShouldInspectParagraph(ByVal para As Paragraph) As Boolean
+    On Error Resume Next
+
+    Dim styleName As String
+
+    ShouldInspectParagraph = False
+
+    If para.Range.StoryType <> wdMainTextStory Then Exit Function
+    If para.Range.Information(wdInFootnoteEndnotePane) Then Exit Function
+    If para.Range.Information(wdWithInTable) Then Exit Function
+
+    styleName = ParaStyleName(para)
+    If styleName Like "TOC*" Or styleName Like "Index*" Then Exit Function
+
+    ShouldInspectParagraph = True
+End Function
+
+Private Function ParaStyleName(ByVal para As Paragraph) As String
+    On Error Resume Next
+
+    If TypeName(para.Range.Style) = "Style" Then
+        ParaStyleName = para.Range.Style.NameLocal
+    Else
+        ParaStyleName = CStr(para.Range.Style)
+    End If
+End Function
+
+Private Function NormalizeNumericCandidate(ByVal value As String) As String
+    Dim candidate As String
+
+    candidate = Trim$(value)
+    candidate = Replace(candidate, vbTab, "")
+    candidate = Replace(candidate, Chr(160), "")
+    candidate = Replace(candidate, ".", "")
+    candidate = Replace(candidate, ":", "")
+    candidate = Replace(candidate, ")", "")
+    candidate = Replace(candidate, "(", "")
+    candidate = Replace(candidate, ";", "")
+
+    NormalizeNumericCandidate = candidate
+End Function
+
 '============== MODULE: INITIALIZE DOCUMENT =============='
 ' Sets global formatting: margins, default section settings, and document properties
 Sub InitializeDocument(ByVal doc As Document)
