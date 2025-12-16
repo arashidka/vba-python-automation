@@ -1,7 +1,8 @@
 Option Explicit
 
-' Master routine: Calls all subroutines in order to build the manuscript template, with error handling
-Sub ApplyMurtidaTemplate()
+'============== MASTER CONTROLLER =============='
+' Master routine: orchestrates the manuscript build with screen updating preserved
+Sub ApplyFullManuscriptTemplate()
     On Error GoTo MasterErr
     Dim doc As Document
     Dim screenUpdateState As Boolean
@@ -11,23 +12,31 @@ Sub ApplyMurtidaTemplate()
 
     Set doc = ActiveDocument
 
-    SetGlobalFormatting doc
-    BuildTitlePage doc
-    InsertDedicationSection doc
-    GenerateTOCPlaceholder doc
-    FormatPrefaceSection doc
-    ApplyStoryTemplate doc
-    InsertGlossarySection doc
-    BuildEndMatter doc
+    InitializeDocument doc
+    ConfigureStyles doc
+    BuildFrontMatter doc
+    ApplyBodyTemplate doc
+    InsertHeadersFooters doc
+    FinalizeDocument doc
 
 CleanExit:
     Application.ScreenUpdating = screenUpdateState
     Exit Sub
 MasterErr:
-    HandleError "ApplyMurtidaTemplate", Err
-    GoTo CleanExit
+    HandleError "ApplyFullManuscriptTemplate", Err
+    Resume CleanExit
 End Sub
 
+' Legacy entry point preserved for compatibility
+Sub ApplyMurtidaTemplate()
+    On Error GoTo LegacyErr
+    ApplyFullManuscriptTemplate
+    Exit Sub
+LegacyErr:
+    HandleError "ApplyMurtidaTemplate", Err
+End Sub
+
+'============== SUPPORT: ERROR HANDLING =============='
 ' Centralized error handler to log and display errors
 Private Sub HandleError(ByVal procedureName As String, ByVal errObj As ErrObject)
     Dim msg As String
@@ -36,15 +45,31 @@ Private Sub HandleError(ByVal procedureName As String, ByVal errObj As ErrObject
     MsgBox msg, vbExclamation, "Murtida Template"
 End Sub
 
-' Sets global formatting: margins, font, line spacing, page numbers, Normal style
-Sub SetGlobalFormatting(ByVal doc As Document)
-    On Error GoTo FormattingErr
+'============== MODULE: INITIALIZE DOCUMENT =============='
+' Sets global formatting: margins, default section settings, and document properties
+Sub InitializeDocument(ByVal doc As Document)
+    On Error GoTo ErrorHandler
+
     With doc.PageSetup
         .TopMargin = InchesToPoints(1)
         .BottomMargin = InchesToPoints(1)
         .LeftMargin = InchesToPoints(1)
         .RightMargin = InchesToPoints(1)
+        .DifferentFirstPageHeaderFooter = True
     End With
+
+    doc.BuiltInDocumentProperties(wdPropertyTitle).Value = "Murtida iyo Maadda"
+    doc.BuiltInDocumentProperties(wdPropertySubject).Value = "Manuscript Template Automation"
+
+    Exit Sub
+ErrorHandler:
+    HandleError "InitializeDocument", Err
+End Sub
+
+'============== MODULE: CONFIGURE STYLES =============='
+' Creates or updates Normal, Heading, and custom styles
+Sub ConfigureStyles(ByVal doc As Document)
+    On Error GoTo ErrorHandler
 
     With doc.Styles(wdStyleNormal).Font
         .Name = "Times New Roman"
@@ -56,26 +81,114 @@ Sub SetGlobalFormatting(ByVal doc As Document)
         .FirstLineIndent = InchesToPoints(0.3)
     End With
 
-    AddCenteredPageNumbers doc
+    With doc.Styles(wdStyleHeading1)
+        .Font.Name = "Times New Roman"
+        .Font.Size = 16
+        .Font.Bold = True
+        .ParagraphFormat.SpaceBefore = 12
+        .ParagraphFormat.SpaceAfter = 6
+        .ParagraphFormat.Alignment = wdAlignParagraphLeft
+    End With
+
+    With doc.Styles(wdStyleHeading2)
+        .Font.Name = "Times New Roman"
+        .Font.Size = 14
+        .Font.Bold = True
+        .ParagraphFormat.SpaceBefore = 6
+        .ParagraphFormat.SpaceAfter = 6
+        .ParagraphFormat.Alignment = wdAlignParagraphLeft
+    End With
+
+    Dim storyTitleStyle As Style
+    Dim lessonStyle As Style
+
+    Set storyTitleStyle = EnsureStyleExists(doc, "Story Title", wdStyleTypeParagraph)
+    ConfigureStoryTitleStyle storyTitleStyle
+
+    Set lessonStyle = EnsureStyleExists(doc, "Lesson", wdStyleTypeParagraph)
+    ConfigureLessonStyle lessonStyle
+
     Exit Sub
-FormattingErr:
-    HandleError "SetGlobalFormatting", Err
+ErrorHandler:
+    HandleError "ConfigureStyles", Err
 End Sub
 
+'============== MODULE: BUILD FRONT MATTER =============='
+' Builds the Title Page, Dedication/Acknowledgments, TOC, and Preface
+Sub BuildFrontMatter(ByVal doc As Document)
+    On Error GoTo ErrorHandler
+
+    BuildTitlePage doc
+    InsertDedicationSection doc
+    GenerateTOCPlaceholder doc
+    FormatPrefaceSection doc
+
+    Exit Sub
+ErrorHandler:
+    HandleError "BuildFrontMatter", Err
+End Sub
+
+'============== MODULE: APPLY BODY TEMPLATE =============='
+' Adds stories, glossary, and end matter sections
+Sub ApplyBodyTemplate(ByVal doc As Document)
+    On Error GoTo ErrorHandler
+
+    ApplyStoryTemplate doc
+    InsertGlossarySection doc
+    BuildEndMatter doc
+
+    Exit Sub
+ErrorHandler:
+    HandleError "ApplyBodyTemplate", Err
+End Sub
+
+'============== MODULE: INSERT HEADERS/FOOTERS =============='
+' Adds centered Arabic page numbers to each section while skipping the title page
+Sub InsertHeadersFooters(ByVal doc As Document)
+    On Error GoTo ErrorHandler
+
+    AddCenteredPageNumbers doc, True
+
+    Exit Sub
+ErrorHandler:
+    HandleError "InsertHeadersFooters", Err
+End Sub
+
+'============== MODULE: FINALIZE DOCUMENT =============='
+' Performs light cleanup and notifies the user
+Sub FinalizeDocument(ByVal doc As Document)
+    On Error GoTo ErrorHandler
+
+    doc.Content.Characters.Last.Select
+    Selection.Collapse wdCollapseEnd
+    Selection.TypeParagraph
+    Selection.HomeKey wdStory
+
+    MsgBox "Murtida template applied successfully.", vbInformation, "Murtida Template"
+    Exit Sub
+ErrorHandler:
+    HandleError "FinalizeDocument", Err
+End Sub
+
+'============== SUPPORT: STYLES AND CONTENT BUILDERS =============='
 ' Adds centered page numbers to each section footer
-Private Sub AddCenteredPageNumbers(ByVal doc As Document)
+Private Sub AddCenteredPageNumbers(ByVal doc As Document, Optional ByVal skipFirstPage As Boolean = False)
     On Error GoTo PageErr
     Dim sec As Section
     Dim footer As HeaderFooter
+    Dim addOnFirstPage As Boolean
+
+    addOnFirstPage = Not skipFirstPage
 
     For Each sec In doc.Sections
+        sec.PageSetup.DifferentFirstPageHeaderFooter = skipFirstPage
         Set footer = sec.Footers(wdHeaderFooterPrimary)
 
         If Not footer Is Nothing Then
             ClearPageNumbers footer
             footer.PageNumbers.NumberStyle = wdPageNumberStyleArabic
             footer.PageNumbers.RestartNumberingAtSection = False
-            footer.PageNumbers.Add PageNumberAlignment:=wdAlignPageNumberCenter, FirstPage:=True
+            footer.PageNumbers.Add PageNumberAlignment:=wdAlignPageNumberCenter, FirstPage:=addOnFirstPage
         End If
     Next sec
     Exit Sub
